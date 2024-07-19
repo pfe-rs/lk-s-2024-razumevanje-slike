@@ -21,16 +21,28 @@ class AIModel:
     
     def get_response(self, message: str, image: Image.Image) -> str:
         # Gets text response from Phi-3-Vision given a message and image
-        if isinstance(image, np.ndarray):
-            image = Image.fromarray(image) # Converts image into array
 
+        # Converts image into array
+        if isinstance(image, np.ndarray):
+            image = Image.fromarray(image)
+
+        # Appends message to context
         context = [
-            {"role": "user", "content": "<|image_1|>\n" + message} # Appends message to context
+            {"role": "user", "content": "<|image_1|>\n" + message}
         ]
-        prompt = self.processor.tokenizer.apply_chat_template(context, tokenize=False, add_generation_prompt=True) # Tokenizes the context
-        inputs = self.processor(prompt, [image], return_tensors="pt").to("cuda:0") # Constructs the embeddings
+
+        # Tokenizes the context
+        prompt = self.processor.tokenizer.apply_chat_template(context, tokenize=False, add_generation_prompt=True)
+
+        # Constructs the embeddings
+        inputs = self.processor(prompt, [image], return_tensors="pt").to("cuda:0")
         
-        generate_ids = self.model.generate(**inputs, eos_token_id=self.processor.tokenizer.eos_token_id, **self.generation_args) # Generates the output
-        generate_ids = generate_ids[:, inputs['input_ids'].shape[1]:] # Gets rid of the input text
-        response = self.processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0] # Decodes the output into a string
+        # Generates the output
+        generate_ids = self.model.generate(**inputs, eos_token_id=self.processor.tokenizer.eos_token_id, **self.generation_args)
+
+        # Gets rid of the input text
+        generate_ids = generate_ids[:, inputs['input_ids'].shape[1]:]
+
+        # Decodes the output into a string
+        response = self.processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
         return response

@@ -21,7 +21,6 @@ class PieChart:
     
     def crop_data(self, data: str) -> str:
         # Crops model's response from first exclamation mark to last
-
         first_exclamation_index = data.find('!')
         last_exclamation_index = data.rfind('!')
             
