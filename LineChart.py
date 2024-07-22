@@ -3,8 +3,9 @@ import json
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
+
 from AIModel import *
+from PIL import Image
 from prompts import *
 
 class LineChart:

@@ -1,15 +1,17 @@
-import json
 import io
+import json
 import pandas as pd
-from io import BytesIO
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
+
+from AIModel import *
+from io import BytesIO
 from PIL import Image, ImageOps
 from prompts import *
 
 class BarChart:
-    def __init__(self, model):
+    def __init__(self, model: AIModel):
         # Constructor
         self.model = model
     
