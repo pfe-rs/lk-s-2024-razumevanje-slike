@@ -14,7 +14,7 @@ class AIModel:
                                                          _attn_implementation="eager")  
         self.processor = AutoProcessor.from_pretrained(self.model_id, trust_remote_code=True)
         self.generation_args = {
-                "max_new_tokens": 1024,
+                "max_new_tokens": 2048,
                 "temperature": 0.0,
                 "do_sample": False,
             }
