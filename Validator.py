@@ -1,16 +1,19 @@
 import glob
 import seaborn as sns
+
 from AIModel import *
 from prompts import *
 
 class Validator:
-    def __init__(self, bad=0, confusion_matrix=[[0, 0, 0, 0] for _ in range(4)]) -> None:
+    def __init__(self, bad=0, confusion_matrix=[[0, 0, 0, 0] for _ in range(4)]):
         # Constructor
+
         self.bad = bad
         self.confusion_matrix = confusion_matrix
         
     def response_number(self, response: str) -> int:
         # Gets the corresponding row or column of a response in order to build confusion matrix
+
         response = response.lower()
         chart_map = {
             "pie chart": 0,
@@ -28,19 +31,23 @@ class Validator:
         
     def validation_helper(self, model: AIModel, message: str, image: Image.Image, correct_response: str) -> None:
         # Builds confusion matrix based on correct response and the response the model gives
+
         i = self.response_number(correct_response)
         j = self.response_number(model.get_response(message, image))
         self.confusion_matrix[i][j] += 1
 
     def validation(self, model: AIModel) -> None:
         # Goes through the database and calls validation_helper for every image
+        
         categories = ["pie", "bar", "line", "trash"]
         labels = ["pie chart", "bar chart", "line chart", "trash"]
 
         for i, category in enumerate(categories):
             print(category)
             
-            counter = 1 # Limits how many images we go through
+            # Limits how many images we go through
+            counter = 1
+            
             for filename in glob.glob(f"/notebooks/dataset/{category}/*.jpg"):
                 if category != "trash":
                     if counter > 100:
