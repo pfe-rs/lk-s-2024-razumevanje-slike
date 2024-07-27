@@ -1,24 +1,37 @@
 import io
 import json
-import pandas as pd
-import matplotlib.colors as mcolors
-import matplotlib.pyplot as plt
+import kaleido
 import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objs._figure as go
 
 from AIModel import *
-from io import BytesIO
-from PIL import Image, ImageOps
+from matplotlib import pyplot as plt
+from PIL import Image
 from prompts import *
 
 class BarChart:
     def __init__(self, model: AIModel):
         # Constructor
+        
         self.model = model
-    
-    def crop_data(self, data: str, symbol: str) -> str:
-        # Crops model's response from first exclamation mark to last
-        first_symbol = data.find(symbol)
-        last_symbol = data.rfind(symbol)
+
+    def fig_to_img(self, fig: go.Figure) -> Image.Image:
+        # Converts a Plotly figure to a PIL Image
+        
+        img_bytes = fig.to_image(format="png")
+        img = Image.open(io.BytesIO(img_bytes))
+        return img
+
+    def crop_data(self, data: str, symbol1: str, symbol2: str = "symbol") -> str:
+        # Crops model's response from the first occurrence of symbol1 to the last occurrence of symbol2
+        
+        if symbol2 == "symbol":
+            symbol2 = symbol1
+        
+        first_symbol = data.find(symbol1)
+        last_symbol = data.rfind(symbol2)
         
         if first_symbol == -1 and last_symbol == -1:
             return data
@@ -30,57 +43,53 @@ class BarChart:
             return data[first_symbol + 1:]
         
         return data[first_symbol + 1:last_symbol]
-    
-    def add_labels(self, ax, x, y):
-        for i in range(len(x)):
-            ax.text(i, y[i], str(y[i]), ha='center', va='bottom', fontsize=7)
-    
-    def ax_to_pil(self, ax):
-        buf = BytesIO()
-        ax.figure.savefig(buf, format='png', bbox_inches='tight')
-        buf.seek(0)
-        # Open the image with PIL
-        img = Image.open(buf)
 
-        return img
-
-    def create_bar_chart(self, data: dict, col, orientation: str, flag) -> plt.Figure:
-        # Creates a pie chart from the provided data.
-        print(col)
-        df = pd.DataFrame.from_dict(data['values'])
-        if orientation == "Horizontal":
-            
-            ax = df.plot.barh(x='parameter', y='value', rot=0, color=col)
-            ax.invert_yaxis()
-            ax.grid(axis='x')
-            if(flag=="YES"):
-                for index, value in enumerate(df['value']):
-                    ax.text(value, index, str(value))
-            #self.add_labels(ax, df['value'], df['parameter'])
-        else:
-            ax = df.plot.bar(x='parameter', y='value', rot=0, color=col)
-            ax.grid(axis='y')
-            if flag=="YES":
-                self.add_labels(ax, df['parameter'], df['value'])
-        return ax
+    def create_bar_chart(self, img: np.ndarray, data: dict, orientation: str, flag: str, odg_perc: str) -> go.Figure:
+        # Creates a bar chart based on the provided data and settings
         
+        values = data['values']
+        df = pd.DataFrame(values)
 
-    def give_chart(self, imggg: np.array) -> Image.Image:
-        # Processes an image, extracts pie chart data, and generates a pie chart.
-        answer = self.model.get_response(bar_chart_prompt, imggg)
+        if odg_perc == "Y":
+            df['value_str'] = df['value'].round(2).astype(str) + '%'
+        
+        if orientation == "Horizontal":
+            fig = px.bar(df, x='value', y='parameter', orientation='h')
+            fig.update_layout(yaxis=dict(autorange='reversed'))
+            title = self.model.get_response(prompt_xtitle, img)
+            fig.update_layout(xaxis_title=title, yaxis_title='')
+        else:
+            fig = px.bar(df, x='parameter', y='value')
+            title = self.model.get_response(prompt_ytitle, img)
+            fig.update_layout(xaxis_title='', yaxis_title=title)
+        
+        if flag == "YES":
+            if odg_perc == "Y":
+                fig.update_traces(text=df['value_str'])
+            else:
+                fig.update_traces(text=df['value'])
+        
+        fig.update_traces(marker_color='blue')
+        return fig
+
+    def give_chart(self, img: np.ndarray) -> Image.Image:
+        # Processes an image to extract chart data and generate a bar chart
+        
+        answer = self.model.get_response(bar_chart_prompt, img)
+        answer = answer.replace('\\', ' or ')
         print(answer)
         
-        odg_lab = self.model.get_response(prompt_label, imggg)
-        odg_lab = self.crop_data(odg_lab, '&')
-        print(odg_lab)
-        
+        odg_orient = self.model.get_response(prompt_orient, img)
+        odg_lab = self.model.get_response(prompt_label, img)
+        odg_perc = self.model.get_response(prompt_perc, img)
+
         podaci = self.crop_data(answer, '!')
-        orientation = self.crop_data(answer, '-')
-        print(orientation)
+        odg_perc = self.crop_data(odg_perc, '&')
+
+        orientation = self.crop_data(odg_orient, '-')
         
-        data = json.loads(podaci)
-        ax = self.create_bar_chart(data, "blue", orientation, odg_lab)
-        img_format = self.ax_to_pil(ax)
-        img_format = ImageOps.expand(img_format, border=(50,50,50,50), fill="white")
+        flag = self.crop_data(odg_lab, '&')
+        data_dict = json.loads(podaci)
         
-        return img_format
+        fig = self.create_bar_chart(img, data_dict, orientation, flag, odg_perc)
+        return self.fig_to_img(fig)
