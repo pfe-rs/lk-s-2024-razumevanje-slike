@@ -1,8 +1,9 @@
 import io
 import json
-import matplotlib.colors as mcolors
-import matplotlib.pyplot as plt
+import kaleido
 import numpy as np
+import plotly.express as px
+import plotly.graph_objs._figure as go
 
 from AIModel import *
 from PIL import Image
@@ -10,35 +11,34 @@ from prompts import *
 
 class LineChart:
     def __init__(self, model: AIModel):
+        # Constructor
+        
         self.model = model
 
-    def fig_to_img(self, fig: plt.Figure) -> Image.Image:
-        # Converts a Matplotlib figure to a PIL Image
-        buf = io.BytesIO()
-        fig.savefig(buf, format='png')
-        buf.seek(0)
-        fig_image = Image.open(buf)
+    def fig_to_img(self, fig: go.Figure) -> Image.Image:
+        # Converts a Plotly figure to a PIL Image
         
-        return fig_image
+        fig_bytes = fig.to_image(format="png")
+        buf = io.BytesIO(fig_bytes)
+        img = Image.open(buf)
+        return img
     
-    def crop_data(self, data: str) -> str:
-        # Crops model's response from first exclamation mark to last
-        first_excl = data.find('!')
-        last_excl = data.rfind('!')
+    def crop_data(self, data: str, symbol1: str, symbol2: str) -> str:
+        # Crops model's response from the first occurrence of symbol1 to the last occurrence of symbol2
         
-        if first_excl == -1 and last_excl == -1:
+        first_symbol = data.find(symbol1)
+        last_symbol = data.rfind(symbol2)
+        
+        if first_symbol == last_symbol and first_symbol == -1:
             return data
-        
-        if first_excl == (len(data) - 2):
-            return data[:last_excl]
-        
-        if last_excl == 0:
-            return data[first_excl + 1:]
-        
-        return data[first_excl + 1:last_excl]
+        if symbol1 == '{':
+            return data[first_symbol:last_symbol + len(symbol2)]
+        else:
+            return data[first_symbol + len(symbol1):last_symbol]
 
-    def create_line_chart(self, data: dict) -> plt.Figure:
+    def create_line_chart(self, data: dict, perc: str) -> go.Figure:
         # Creates a line chart from the provided data
+        
         x, y = [], []
         y_label = data['Y_Axis']['Label']
         del data['Y_Axis']
@@ -48,35 +48,48 @@ class LineChart:
         for info in data:
             x_value = info['X_Value']
             y_value = info['Y_Value']
-
-            if y_value[-1] == "%":
-                y_value = y_value[:-1]
-                y_value = float(y_value) * 0.01
+            
+            if isinstance(y_value, str):
+                if y_value[-1] == '%':
+                    perc = "YES"
+                    y_value = y_value[:-1]
+                    y_value = round(float(y_value) * 0.01, 4)
+                elif perc == "YES":
+                    y_value = round(float(y_value) * 0.01, 4)
+                else:
+                    y_value = round(float(y_value), 2)
+            elif perc == "YES":
+                y_value = round(float(y_value) * 0.01, 4)
             else:
-                y_value = float(y_value)
+                y_value = round(float(y_value), 2)
 
             x.append(x_value)
-            y.append(round(y_value, 2))
+            y.append(y_value)
 
-        fig, ax = plt.subplots(figsize=(8, 6))
-
-        ax.grid(axis='y')
-        ax.plot(x, y, marker='o', linestyle='-')
-        ax.tick_params(axis='x', rotation=45)
-        ax.set_ylabel(y_label)
+        fig = px.line(x = x, y = y)
         
-        for i, (xi, yi) in enumerate(zip(x, y)):
-            plt.annotate(f'({xi}, {yi})', (xi, yi), textcoords="offset points", xytext=(0, 10), ha='center')
+        fig.update_xaxes(tickangle=45)
+        fig.update_layout(yaxis_tickformat=".2f")
+        fig.update_layout(yaxis_title=dict(text=y_label), xaxis_title=None)
+        if perc == "YES":
+            fig.update_layout(yaxis_tickformat=".2%")
         
         return fig
 
     def give_chart(self, img: Image.Image) -> Image.Image:
-        # Processes an image, extracts line chart data, and generates a line chart
-        answer = self.model.get_response(line_chart_prompt, img)
-        answer = self.crop_data(answer)
+        # Processes an PIL Image, extracts line chart data, and generates a line chart
         
-        data = json.loads(answer)
-        fig = self.create_line_chart(data)
-        img_format = self.fig_to_img(fig)
+        perc_response = self.model.get_response(line_chart_percentages_prompt, img)
+        perc_response = self.crop_data(perc_response, '&', '&')
         
-        return img_format
+        data = self.model.get_response(line_chart_prompt, img)
+        data = self.crop_data(data, '{', '}\n}')
+
+        try:
+            points = json.loads(data)
+            fig = self.create_line_chart(points, perc_response)
+            img_format = self.fig_to_img(fig)
+            return img_format
+        except:
+            img_format = Image.open("/notebooks/image_2024-07-18_195702655.png")
+            return img_format

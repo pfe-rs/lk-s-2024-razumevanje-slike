@@ -1,10 +1,12 @@
 import numpy as np
-from transformers import AutoModelForCausalLM, AutoProcessor
+
 from PIL import Image
+from transformers import AutoModelForCausalLM, AutoProcessor
 
 class AIModel:
-    def __init__(self) -> None:
+    def __init__(self):
         # Constructor
+        
         self.model_id = "microsoft/Phi-3-vision-128k-instruct" 
         self.model = AutoModelForCausalLM.from_pretrained(self.model_id,
                                                          cache_dir="/notebooks/my_models/phi_3_vision",
@@ -14,10 +16,10 @@ class AIModel:
                                                          _attn_implementation="eager")  
         self.processor = AutoProcessor.from_pretrained(self.model_id, trust_remote_code=True)
         self.generation_args = {
-                "max_new_tokens": 2048,
-                "temperature": 0.0,
-                "do_sample": False,
-            }
+            "max_new_tokens": 2048,
+            "temperature": 0.0,
+            "do_sample": False,
+        }
     
     def get_response(self, message: str, image: Image.Image) -> str:
         # Gets text response from Phi-3-Vision given a message and image
